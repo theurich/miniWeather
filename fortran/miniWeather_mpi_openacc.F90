@@ -1,5 +1,5 @@
-#define acc_no_async_and_wait
-#define acc_no_data_and_update
+#define acc_no_async_and_wait_NOT
+#define acc_no_data_and_update_NOT
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! miniWeather
@@ -221,6 +221,7 @@ contains
       call semi_discrete_step( state , state_tmp , state_tmp , dt / 2 , DIR_X , flux , tend )
       call semi_discrete_step( state , state_tmp , state     , dt / 1 , DIR_X , flux , tend )
     endif
+    direction_switch = .not. direction_switch
   end subroutine perform_timestep
 
 
