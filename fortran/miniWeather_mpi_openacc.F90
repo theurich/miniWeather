@@ -1,3 +1,4 @@
+#define acc_no_async_and_wait
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! miniWeather
@@ -125,7 +126,10 @@ program miniweather
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! MAIN TIME STEP LOOP
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#ifdef acc_no_async_and_wait
+#else
   !$acc wait
+#endif
   if (mainproc) call system_clock(t1)
   do while (etime < sim_time)
     !If the time step leads to exceeding the simulation time, shorten it for the last step
@@ -145,7 +149,10 @@ program miniweather
 !      call output(state,etime)
     endif
   enddo
+#ifdef acc_no_async_and_wait
+#else
   !$acc wait
+#endif
   if (mainproc) then
     call system_clock(t2,rate)
     write(*,*) "CPU Time: ",dble(t2-t1)/dble(rate)
@@ -240,7 +247,11 @@ contains
     endif
 
     !Apply the tendencies to the fluid state
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(3)
+#else
     !$acc parallel loop collapse(3) async
+#endif
     do ll = 1 , NUM_VARS
       do k = 1 , nz
         do i = 1 , nx
@@ -287,7 +298,11 @@ contains
     !Compute the hyperviscosity coefficient
     hv_coef = -hv_beta * dx / (16*dt)
     !Compute fluxes in the x-direction for each cell
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(2) private(stencil,vals,d3_vals)
+#else
     !$acc parallel loop collapse(2) private(stencil,vals,d3_vals) async
+#endif
     do k = 1 , nz
       do i = 1 , nx+1
         !Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -317,7 +332,11 @@ contains
     enddo
 
     !Use the fluxes to compute tendencies for each cell
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(3)
+#else
     !$acc parallel loop collapse(3) async
+#endif
     do ll = 1 , NUM_VARS
       do k = 1 , nz
         do i = 1 , nx
@@ -343,7 +362,11 @@ contains
     !Compute the hyperviscosity coefficient
     hv_coef = -hv_beta * dz / (16*dt)
     !Compute fluxes in the x-direction for each cell
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(2) private(stencil,vals,d3_vals)
+#else
     !$acc parallel loop collapse(2) private(stencil,vals,d3_vals) async
+#endif
     do k = 1 , nz+1
       do i = 1 , nx
         !Use fourth-order interpolation from four cell averages to compute the value at the interface in question
@@ -378,7 +401,11 @@ contains
     enddo
 
     !Use the fluxes to compute tendencies for each cell
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(3)
+#else
     !$acc parallel loop collapse(3) async
+#endif
     do ll = 1 , NUM_VARS
       do k = 1 , nz
         do i = 1 , nx
@@ -400,7 +427,11 @@ contains
     real(rp) :: z
 
     if (nranks == 1) then
+#ifdef acc_no_async_and_wait
+      !$acc parallel loop collapse(2)
+#else
       !$acc parallel loop collapse(2) async
+#endif
       do ll = 1 , NUM_VARS
         do k = 1 , nz
           state(-1  ,k,ll) = state(nx-1,k,ll)
@@ -417,7 +448,11 @@ contains
     call mpi_irecv(recvbuf_r,hs*nz*NUM_VARS,mpi_type,right_rank,1,MPI_COMM_WORLD,req_r(2),ierr)
 
     !Pack the send buffers
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(3)
+#else
     !$acc parallel loop collapse(3) async
+#endif
     do ll = 1 , NUM_VARS
       do k = 1 , nz
         do s = 1 , hs
@@ -427,8 +462,12 @@ contains
       enddo
     enddo
 
+#ifdef acc_no_async_and_wait
+    !$acc update host(sendbuf_l,sendbuf_r)
+#else
     !$acc update host(sendbuf_l,sendbuf_r) async
     !$acc wait
+#endif
 
     !Fire off the sends
     call mpi_isend(sendbuf_l,hs*nz*NUM_VARS,mpi_type, left_rank,1,MPI_COMM_WORLD,req_s(1),ierr)
@@ -437,10 +476,18 @@ contains
     !Wait for receives to finish
     call mpi_waitall(2,req_r,status,ierr)
 
+#ifdef acc_no_async_and_wait
+    !$acc update device(recvbuf_l,recvbuf_r)
+#else
     !$acc update device(recvbuf_l,recvbuf_r) async
+#endif
 
     !Unpack the receive buffers
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(3)
+#else
     !$acc parallel loop collapse(3) async
+#endif
     do ll = 1 , NUM_VARS
       do k = 1 , nz
         do s = 1 , hs
@@ -455,7 +502,11 @@ contains
 
     if (data_spec_int == DATA_SPEC_INJECTION) then
       if (myrank == 0) then
+#ifdef acc_no_async_and_wait
+        !$acc parallel loop
+#else
         !$acc parallel loop async
+#endif
         do k = 1 , nz
           z = (k_beg-1 + k-0.5_rp)*dz
           if (abs(z-3*zlen/4) <= zlen/16) then
@@ -474,7 +525,11 @@ contains
     implicit none
     real(rp), intent(inout) :: state(1-hs:nx+hs,1-hs:nz+hs,NUM_VARS)
     integer :: i, ll
+#ifdef acc_no_async_and_wait
+    !$acc parallel loop collapse(2)
+#else
     !$acc parallel loop collapse(2) async
+#endif
     do ll = 1 , NUM_VARS
       do i = 1-hs,nx+hs
         if (ll == ID_WMOM) then
@@ -792,8 +847,12 @@ contains
     real(rp), allocatable :: dens(:,:), uwnd(:,:), wwnd(:,:), theta(:,:)
     real(rp) :: etimearr(1)
 
+#ifdef acc_no_async_and_wait
+    !$acc update host(state)
+#else
     !$acc update host(state) async
     !$acc wait
+#endif
 
     !Inform the user
     if (mainproc) write(*,*) '*** OUTPUT ***'
