@@ -6,7 +6,10 @@ project(MiniWeather
 
 add_executable(miniWeather_mpi_openacc miniWeather_mpi_openacc.F90)
 
-set(CMAKE_Fortran_FLAGS "-Minfo=all,intensity")
+set(CMAKE_Fortran_FLAGS "-O2 -fast -Minfo=all,intensity")
+
+find_package(MPI REQUIRED)
+target_link_libraries(miniWeather_mpi_openacc PUBLIC MPI::MPI_Fortran)
 
 find_package(PkgConfig REQUIRED)
 pkg_search_module(PNETCDF REQUIRED pnetcdf)
