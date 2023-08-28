@@ -1,4 +1,5 @@
 #define acc_no_async_and_wait
+#define acc_no_data_and_update
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !! miniWeather
@@ -111,7 +112,9 @@ program miniweather
   !Initialize MPI, allocate arrays, initialize the grid and the data
   call init(dt)
 
+#ifndef acc_no_data_and_update
   !$acc data copyin(state_tmp,hy_dens_cell,hy_dens_theta_cell,hy_dens_int,hy_dens_theta_int,hy_pressure_int) create(flux,tend,sendbuf_l,sendbuf_r,recvbuf_l,recvbuf_r) copy(state)
+#endif
 
   !Initial reductions for mass, kinetic energy, and total energy
   call reductions(mass0,te0)
@@ -161,7 +164,9 @@ program miniweather
   !Final reductions for mass, kinetic energy, and total energy
   call reductions(mass,te)
 
+#ifndef acc_no_data_and_update
   !$acc end data
+#endif
 
   if (mainproc) then
     write(*,*) "mass: ", mass
@@ -463,9 +468,13 @@ contains
     enddo
 
 #ifdef acc_no_async_and_wait
+#ifndef acc_no_data_and_update
     !$acc update host(sendbuf_l,sendbuf_r)
+#endif
 #else
+#ifndef acc_no_data_and_update
     !$acc update host(sendbuf_l,sendbuf_r) async
+#endif
     !$acc wait
 #endif
 
@@ -477,9 +486,13 @@ contains
     call mpi_waitall(2,req_r,status,ierr)
 
 #ifdef acc_no_async_and_wait
+#ifndef acc_no_data_and_update
     !$acc update device(recvbuf_l,recvbuf_r)
+#endif
 #else
+#ifndef acc_no_data_and_update
     !$acc update device(recvbuf_l,recvbuf_r) async
+#endif
 #endif
 
     !Unpack the receive buffers
@@ -848,9 +861,13 @@ contains
     real(rp) :: etimearr(1)
 
 #ifdef acc_no_async_and_wait
+#ifndef acc_no_data_and_update
     !$acc update host(state)
+#endif
 #else
+#ifndef acc_no_data_and_update
     !$acc update host(state) async
+#endif
     !$acc wait
 #endif
 
@@ -925,6 +942,7 @@ contains
     call ncwrap( nfmpi_begin_indep_data(ncid) , __LINE__ )
     !write elapsed time to file
     if (mainproc) then
+    
 #ifdef SINGLE_PREC
       st1=(/num_out+1/); ct1=(/1/); etimearr(1) = etime; call ncwrap( nfmpi_put_vara_real( ncid , t_varid , st1 , ct1 , etimearr ) , __LINE__ )
 #else
