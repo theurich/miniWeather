@@ -60,11 +60,11 @@ program miniweather
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !The x-direction length is twice as long as the z-direction length
   !So, you'll want to have nx_glob be twice as large as nz_glob
-  integer , parameter :: nx_glob = _NX              !Number of total grid cells in the x dimension
-  integer , parameter :: nz_glob = _NZ              !Number of total grid cells in the z dimension
-  real(rp), parameter :: sim_time = _SIM_TIME       !How many seconds to run the simulation
-  real(rp), parameter :: output_freq = _OUT_FREQ    !How frequently to output data to file (in seconds)
-  integer , parameter :: data_spec_int = _DATA_SPEC !How to initialize the data
+  integer , parameter :: nx_glob = 400              !Number of total grid cells in the x dimension
+  integer , parameter :: nz_glob = 200              !Number of total grid cells in the z dimension
+  real(rp), parameter :: sim_time = 1000       !How many seconds to run the simulation
+  real(rp), parameter :: output_freq = 10    !How frequently to output data to file (in seconds)
+  integer , parameter :: data_spec_int = DATA_SPEC_COLLISION !How to initialize the data
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! END USER-CONFIGURABLE PARAMETERS
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -116,7 +116,11 @@ program miniweather
   call reductions(mass0,te0)
 
   !Output the initial state
-  call output(state,etime)
+!  call output(state,etime)
+  if (mainproc) then
+    write(*,*) "mass: ", mass0
+    write(*,*) "te:   ", te0
+  endif
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! MAIN TIME STEP LOOP
@@ -130,7 +134,7 @@ program miniweather
     call perform_timestep(state,state_tmp,flux,tend,dt)
     !Inform the user
 #ifndef NO_INFORM
-    if (mainproc) write(*,*) 'Elapsed Time: ', etime , ' / ' , sim_time
+!    if (mainproc) write(*,*) 'Elapsed Time: ', etime , ' / ' , sim_time
 #endif
     !Update the elapsed time and output counter
     etime = etime + dt
@@ -138,7 +142,7 @@ program miniweather
     !If it's time for output, reset the counter, and do output
     if (output_counter >= output_freq) then
       output_counter = output_counter - output_freq
-      call output(state,etime)
+!      call output(state,etime)
     endif
   enddo
   !$acc wait
@@ -153,6 +157,8 @@ program miniweather
   !$acc end data
 
   if (mainproc) then
+    write(*,*) "mass: ", mass
+    write(*,*) "te:   ", te
     write(*,*) "d_mass: ", (mass - mass0)/mass0
     write(*,*) "d_te:   ", (te   - te0  )/te0
   endif
